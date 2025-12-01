@@ -1,5 +1,6 @@
 const std = @import("std");
 pub const Server = @import("Server.zig");
+pub const cache = @import("cache.zig");
 
 pub fn getHeader(r: std.http.Server.Request, key: []const u8) ?[]const u8 {
     var iter = r.iterateHeaders();
