@@ -3,14 +3,17 @@
     .version = "0.0.0",
     .minimum_zig_version = "0.15.1",
     .dependencies = .{
+        .zemplate = .{
+            .url = "git+https://github.com/voidKandy/zemplate#f6b2d322a7701ce0c028262947010fd7e93609cc",
+            .hash = "zemplate-1.0.0-tSKpW9U_AABuhNKlEgfBCErWtNvAigXFO8M64qLBXfZ-",
+        },
         .tls = .{
-            .hash = "tls-0.1.0-ER2e0gNoBQBLuvbg_hPuGQYoCVsn-kHDuupr0hsapu4P",
+            .url = "git+https://github.com/ianic/tls.zig#787d4e4658339ecc6375ebef86fdde9858ecc72c",
+            .hash = "tls-0.1.0-ER2e0rhrBQA5A7uqCcns4VefWWAgfiv5tTxSTi_-Y297",
         },
         .mime = .{
+            .url = "git+https://github.com/andrewrk/mime#4535b74bd5fcaa03e22f2f25af164a4c6253af00",
             .hash = "mime-4.0.0-zwmL--0gAACndOVlROQeDnM0chfojNDS8tpohlsBqMNy",
-        },
-        .zemplate = .{
-            .hash = "zemplate-1.0.0-tSKpW9U_AABuhNKlEgfBCErWtNvAigXFO8M64qLBXfZ-",
         },
     },
     .paths = .{
