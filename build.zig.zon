@@ -1,0 +1,21 @@
+.{
+    .name = .zyph,
+    .version = "0.0.0",
+    .minimum_zig_version = "0.15.1",
+    .dependencies = .{
+        .tls = .{
+            .hash = "tls-0.1.0-ER2e0gNoBQBLuvbg_hPuGQYoCVsn-kHDuupr0hsapu4P",
+        },
+        .mime = .{
+            .hash = "mime-4.0.0-zwmL--0gAACndOVlROQeDnM0chfojNDS8tpohlsBqMNy",
+        },
+        .zemplate = .{
+            .hash = "zemplate-1.0.0-tSKpW9U_AABuhNKlEgfBCErWtNvAigXFO8M64qLBXfZ-",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
