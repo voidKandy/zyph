@@ -10,7 +10,7 @@ test "main" {
     defer if (gpa.detectLeaks()) std.log.err("LEAKS DETECTED IN MAIN ALLOCATOR\n", .{});
 
     const allocator = gpa.allocator();
-    var server = zyph.Server.init(allocator, null);
+    var server = zyph.Server.init(allocator, try std.fs.cwd().openDir("pages", .{}), null);
     defer server.deinit();
 
     try server.routes.registerHypermediaEndpoint("/", &.{}, &struct {

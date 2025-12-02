@@ -14,16 +14,31 @@ allocator: std.mem.Allocator,
 tls_auth: ?*tls.config.CertKeyPair = null,
 server: std.net.Server = undefined,
 
+/// Additional Options
+///
+/// where the library will expect to find pages
+/// Currently this is only necessary because of the way
+/// full page refreshes are handled;
+/// They require a template, which requires the index.html file
+/// Currently, I dont love this and would prefer this wasnt coupled and
+/// users use whatever they wanted in place of a templaet. But at the same time,
+/// this server architecture requires accessing a home template because of its
+/// Hypermedia Oriented design
+/// Another huge downside of this is that it leaks all the way down to ConnectionContext
+pages_directory: std.fs.Dir,
+
 const Self = @This();
 
 pub fn init(
     a: std.mem.Allocator,
-    dir: ?std.fs.Dir,
+    pages_dir: std.fs.Dir,
+    file_server_dir: ?std.fs.Dir,
 ) Self {
     @import("components.zig").ComponentsDirectory.init(a);
     return .{
         .routes = RouteMap.init(a),
-        .files = if (dir) |d| FileServer.init(.{
+        .pages_directory = pages_dir,
+        .files = if (file_server_dir) |d| FileServer.init(.{
             .allocator = a,
             .root_dir = d,
         }) catch @panic("failed to init file server") else null,

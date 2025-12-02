@@ -18,6 +18,7 @@ connection: ConnectionType,
 auth: *const ?*tls.config.CertKeyPair,
 file_server: ?*const FileServer,
 map_ptr: *const RouteMap,
+pages_directory: *const std.fs.Dir,
 const Self = @This();
 
 const ConnectionType = union(enum) {
@@ -25,26 +26,19 @@ const ConnectionType = union(enum) {
     https: *tls.Connection,
 };
 
-const FullPageResponse = struct {
-    route_content: []u8,
-};
-/// When the client requires a full page refresh we send them this
-/// Ultimately, the user should define this as a template that has a place
-/// to put the contents of the writer at the end of the pipeline
-pub const FPRTemplate = zemplate.Template(FullPageResponse, @embedFile("index.html"));
-
 const RECV_BUF_SIZE = 16 * 1024;
 const SEND_BUF_SIZE = 16 * 1024;
 
-pub fn init(allocator: std.mem.Allocator, dispatcher: *const *Server, conn: std.net.Server.Connection) std.mem.Allocator.Error!Self {
+pub fn init(allocator: std.mem.Allocator, server: *const *Server, conn: std.net.Server.Connection) std.mem.Allocator.Error!Self {
     return .{
         .allocator = allocator,
         .connection = .{ .http = conn },
-        .file_server = if (dispatcher.*.files) |f| &f else null,
-        .auth = &dispatcher.*.tls_auth,
+        .file_server = if (server.*.files) |f| &f else null,
+        .auth = &server.*.tls_auth,
         .recv_buf = try allocator.alloc(u8, RECV_BUF_SIZE),
         .send_buf = try allocator.alloc(u8, SEND_BUF_SIZE),
-        .map_ptr = &dispatcher.*.routes,
+        .map_ptr = &server.*.routes,
+        .pages_directory = &server.*.pages_directory,
     };
 }
 
@@ -101,11 +95,16 @@ pub fn dispatchRequest(self: *Self, request: *Request) !void {
     }
 
     if (!is_htmx_request) {
-        var tmplt = FPRTemplate.init(.{
-            .route_content = try writer.toOwnedSlice(),
-        });
 
-        const render = try tmplt.render(self.allocator, .{});
+        // I really hate this
+        const tmplt_str = try self.pages_directory.readFileAlloc(self.allocator, "index.html", 1024 * 64);
+        const render = try zemplate.template.render(
+            self.allocator,
+            .{ .route_content = try writer.toOwnedSlice() },
+            tmplt_str,
+            .{},
+        );
+
         try writer.writer.writeAll(render);
     }
 
