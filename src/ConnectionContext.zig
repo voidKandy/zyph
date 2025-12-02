@@ -68,13 +68,17 @@ pub fn dispatchRequest(self: *Self, request: *Request) !void {
     log.debug(
         \\ is htmx: {any}
         \\ info: {s}
-    , .{ is_htmx_request, hydrated_info orelse "null" });
+    , .{ is_htmx_request, hydrated_info orelse "None" });
 
     const oob_swap = if (hydrated_info == null) "innerHTML" else "beforeend";
 
     var writer = std.Io.Writer.Allocating.init(self.allocator);
     defer writer.deinit();
     const func_opt = self.map_ptr.*.map.get(parts.path);
+
+    log.debug(
+        \\ Got Function Pointer: {any}
+    , .{func_opt});
     var not_found = func_opt == null;
 
     if (func_opt) |func| {
@@ -95,6 +99,9 @@ pub fn dispatchRequest(self: *Self, request: *Request) !void {
     }
 
     if (!is_htmx_request) {
+        log.debug(
+            \\ requires full page refresh
+        , .{});
 
         // I really hate this
         const tmplt_str = try self.pages_directory.readFileAlloc(self.allocator, "index.html", 1024 * 64);
