@@ -21,7 +21,6 @@ pub fn build(b: *std.Build) void {
     mod.addImport("mime", mime.module("mime"));
     mod.addImport("tls", tls.module("tls"));
     mod.addImport("zemplate", zemplate.module("zemplate"));
-    embedPages(b, mod) catch @panic("failed to embed pages");
 
     const lib_unit_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -40,21 +39,4 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     // test_step.dependOn(&zemplate.step);
     test_step.dependOn(&run_lib_unit_tests.step);
-}
-
-const PAGES_DIRECTORY = "pages";
-pub fn embedPages(b: *std.Build, mod: *std.Build.Module) !void {
-    var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
-
-    const cwd = std.fs.cwd();
-    var dir = try cwd.openDir(PAGES_DIRECTORY, .{ .iterate = true });
-    var it = dir.iterate();
-
-    while (try it.next()) |entry| {
-        if (entry.kind != .file) continue;
-        if (entry.name[0] == '.') continue;
-        mod.addAnonymousImport(entry.name, .{ .root_source_file = b.path(try std.fmt.allocPrint(arena, "{s}/{s}", .{ PAGES_DIRECTORY, entry.name })) });
-    }
 }
