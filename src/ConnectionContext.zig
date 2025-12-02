@@ -16,7 +16,7 @@ recv_buf: []u8,
 send_buf: []u8,
 connection: ConnectionType,
 auth: *const ?*tls.config.CertKeyPair,
-file_server: ?*const FileServer,
+file_server: *const ?FileServer,
 map_ptr: *const RouteMap,
 pages_directory: *const std.fs.Dir,
 const Self = @This();
@@ -33,7 +33,7 @@ pub fn init(allocator: std.mem.Allocator, server: *const *Server, conn: std.net.
     return .{
         .allocator = allocator,
         .connection = .{ .http = conn },
-        .file_server = if (server.*.files) |f| &f else null,
+        .file_server = &server.*.files,
         .auth = &server.*.tls_auth,
         .recv_buf = try allocator.alloc(u8, RECV_BUF_SIZE),
         .send_buf = try allocator.alloc(u8, SEND_BUF_SIZE),
@@ -227,12 +227,12 @@ pub fn handleConnection(self: *Self) !void {
 
 fn serveHTTP(self: *Self, server: *std.http.Server, request: *Request) !void {
     var body: ?[]u8 = null;
-    if (self.file_server == null) {
+    if (self.file_server.* == null) {
         log.debug(
             \\ No File Server
         , .{});
     } else {
-        if (self.file_server.?.serve(request)) |_| {
+        if (self.file_server.*.?.serve(request)) |_| {
             log.info(
                 \\ File server served: {s}
             , .{request.head.target});
