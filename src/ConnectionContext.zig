@@ -11,14 +11,13 @@ const getHeader = @import("root.zig").getHeader;
 const parseRequestParts = @import("root.zig").parseRequestParts;
 const ComponentsDirectory = @import("components.zig").ComponentsDirectory;
 
+/// A single connection context is created per client connection
 allocator: std.mem.Allocator,
 recv_buf: []u8,
 send_buf: []u8,
 connection: ConnectionType,
-auth: *const ?*tls.config.CertKeyPair,
-file_server: *const ?FileServer,
-map_ptr: *const RouteMap,
 index_file_content: []u8,
+server_ptr: *const Server,
 const Self = @This();
 
 const ConnectionType = union(enum) {
@@ -31,17 +30,14 @@ const FullPageRefreshTemplate = zemplate.Template(struct { route_content: []cons
 const RECV_BUF_SIZE = 16 * 1024;
 const SEND_BUF_SIZE = 16 * 1024;
 
-pub fn init(allocator: std.mem.Allocator, server: *const *Server, conn: std.net.Server.Connection) std.mem.Allocator.Error!Self {
+pub fn init(allocator: std.mem.Allocator, server: *const Server, conn: std.net.Server.Connection) std.mem.Allocator.Error!Self {
     return .{
         .allocator = allocator,
         .connection = .{ .http = conn },
-        .file_server = &server.*.files,
-        .auth = &server.*.tls_auth,
+        .server_ptr = server,
         .recv_buf = try allocator.alloc(u8, RECV_BUF_SIZE),
         .send_buf = try allocator.alloc(u8, SEND_BUF_SIZE),
-        .map_ptr = &server.*.routes,
         .index_file_content = try allocator.dupe(u8, server.*.index_file_content),
-        // .pages_directory = &server.*.pages_directory,
     };
 }
 
@@ -58,7 +54,6 @@ pub fn deinit(self: *Self) void {
         },
     }
 
-    self.auth = undefined;
     self.allocator.free(self.recv_buf);
     self.allocator.free(self.send_buf);
 }
@@ -77,12 +72,14 @@ pub fn dispatchRequest(self: *Self, request: *Request) !void {
 
     var writer = std.Io.Writer.Allocating.init(self.allocator);
     defer writer.deinit();
-    const func_opt = self.map_ptr.*.map.get(parts.path);
+    const func_opt = self.server_ptr.*.routes.map.get(parts.path);
 
     log.debug(
         \\ Got Function Pointer: {any}
     , .{func_opt});
     var not_found = func_opt == null;
+
+    // for (self.middlewares) |middleware| {}
 
     if (func_opt) |func| {
         func.call(self.allocator, request, &writer.writer) catch |e| {
@@ -91,6 +88,7 @@ pub fn dispatchRequest(self: *Self, request: *Request) !void {
             , .{e});
             not_found = e == error.NotFound;
         };
+
         switch (func) {
             .data => if (!not_found) return,
             else => {},
@@ -98,7 +96,7 @@ pub fn dispatchRequest(self: *Self, request: *Request) !void {
     }
 
     if (not_found) {
-        try self.map_ptr.*.notFound(request.*, &writer.writer);
+        try self.server_ptr.*.routes.notFound(request.*, &writer.writer);
     }
 
     if (!is_htmx_request) {
@@ -168,7 +166,7 @@ pub fn handleConnection(self: *Self) !void {
     defer self.deinit();
     const addr = self.connection.http.address;
 
-    if (self.auth.*) |auth_ptr| {
+    if (self.server_ptr.*.tls_auth) |auth_ptr| {
         const tls_conn = try self.allocator.create(tls.Connection);
         tls_conn.* = try tls.serverFromStream(self.connection.http.stream, .{ .auth = auth_ptr });
         self.connection = .{ .https = tls_conn };
@@ -232,29 +230,27 @@ pub fn handleConnection(self: *Self) !void {
 
 fn serveHTTP(self: *Self, server: *std.http.Server, request: *Request) !void {
     var body: ?[]u8 = null;
-    if (self.file_server.* == null) {
+    if (self.server_ptr.*.files == null) {
         log.debug(
             \\ No File Server
         , .{});
-    } else {
-        if (self.file_server.*.?.serve(request)) |_| {
+    } else if (self.server_ptr.*.files.?.serve(request)) |_| {
+        log.info(
+            \\ File server served: {s}
+        , .{request.head.target});
+        return;
+    } else |e| switch (e) {
+        error.FileNotFound => {
             log.info(
-                \\ File server served: {s}
+                \\ File server could not find: {s}
             , .{request.head.target});
-            return;
-        } else |e| switch (e) {
-            error.FileNotFound => {
-                log.info(
-                    \\ File server could not find: {s}
-                , .{request.head.target});
-            },
-            else => {
-                log.err(
-                    \\ File server encountered an error: {any}
-                , .{e});
-                return e;
-            },
-        }
+        },
+        else => {
+            log.err(
+                \\ File server encountered an error: {any}
+            , .{e});
+            return e;
+        },
     }
 
     if (request.head.content_length) |content_len| {
