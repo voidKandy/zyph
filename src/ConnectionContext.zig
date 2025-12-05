@@ -26,6 +26,8 @@ const ConnectionType = union(enum) {
     https: *tls.Connection,
 };
 
+const FullPageRefreshTemplate = zemplate.Template(struct { route_content: []const u8 });
+
 const RECV_BUF_SIZE = 16 * 1024;
 const SEND_BUF_SIZE = 16 * 1024;
 
@@ -104,13 +106,10 @@ pub fn dispatchRequest(self: *Self, request: *Request) !void {
         , .{});
 
         // I really hate this
-        const tmplt_str = try self.pages_directory.readFileAlloc(self.allocator, "index.html", 1024 * 64);
-        const render = try zemplate.template.render(
-            self.allocator,
-            .{ .route_content = try writer.toOwnedSlice() },
-            tmplt_str,
-            .{},
-        );
+        // because it forces users to have an index.html within their pages directory
+        const tmplt_str = try self.pages_directory.*.readFileAlloc(self.allocator, "index.html", 1024 * 64);
+        var tmpl = FullPageRefreshTemplate.init(.{ .route_content = try writer.toOwnedSlice() });
+        const render = try tmpl.render(self.allocator, tmplt_str, .{});
 
         try writer.writer.writeAll(render);
     }
