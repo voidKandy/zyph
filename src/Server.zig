@@ -16,28 +16,34 @@ server: std.net.Server = undefined,
 
 /// Additional Options
 ///
-/// where the library will expect to find pages
-/// Currently this is only necessary because of the way
-/// full page refreshes are handled;
-/// They require a template, which requires the index.html file
-/// Currently, I dont love this and would prefer this wasnt coupled and
-/// users use whatever they wanted in place of a templaet. But at the same time,
-/// this server architecture requires accessing a home template because of its
-/// Hypermedia Oriented design
-/// Another huge downside of this is that it leaks all the way down to ConnectionContext
-pages_directory: std.fs.Dir,
+/// The entrypoint of the Hypermedia App
+index_file_content: []u8,
 
 const Self = @This();
 
 pub fn init(
     a: std.mem.Allocator,
-    pages_dir: std.fs.Dir,
+    index_file: std.fs.File,
+    // pages_dir: std.fs.Dir,
     file_server_dir: ?std.fs.Dir,
 ) Self {
     @import("components.zig").ComponentsDirectory.init(a);
+    var reader_buffer: [1024 * 64]u8 = undefined;
+    var reader = index_file.reader(&reader_buffer);
+    var dest_buffer: [1024 * 64]u8 = undefined;
+    var amt_read: usize = 0;
+    while (true) {
+        const amt = reader.readPositional(&dest_buffer) catch |e| if (e == error.EndOfStream) break else @panic("failed to read index file");
+        amt_read += amt;
+        if (amt <= 0) break;
+    }
+    const index_file_content = a.dupe(u8, dest_buffer[0..amt_read]) catch @panic("out of memory");
+    log.warn(
+        \\ INDEX FILE: {s}
+    , .{index_file_content});
     return .{
         .routes = RouteMap.init(a),
-        .pages_directory = pages_dir,
+        .index_file_content = index_file_content,
         .files = if (file_server_dir) |d| FileServer.init(.{
             .allocator = a,
             .root_dir = d,
@@ -59,17 +65,18 @@ pub fn deinit(self: *Self) void {
         a.deinit(self.allocator);
         self.allocator.destroy(a);
     }
+    self.allocator.free(self.index_file_content);
     self.server.deinit();
 }
 
 pub fn startServer(self: *Self, addr: std.net.Address, opts: std.net.Address.ListenOptions) !void {
-    log.info(
-        \\ Listening on {f}
-    , .{addr});
     self.server = try std.net.Address.listen(addr, opts);
 }
 
 pub fn listen(self: *Self) !void {
+    log.info(
+        \\ Listening on {f}
+    , .{self.server.listen_address});
     var gpa = std.heap.GeneralPurposeAllocator(.{
         .thread_safe = true,
     }){};

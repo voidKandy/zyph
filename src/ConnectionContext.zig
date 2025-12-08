@@ -18,7 +18,7 @@ connection: ConnectionType,
 auth: *const ?*tls.config.CertKeyPair,
 file_server: *const ?FileServer,
 map_ptr: *const RouteMap,
-pages_directory: *const std.fs.Dir,
+index_file_content: []u8,
 const Self = @This();
 
 const ConnectionType = union(enum) {
@@ -40,7 +40,8 @@ pub fn init(allocator: std.mem.Allocator, server: *const *Server, conn: std.net.
         .recv_buf = try allocator.alloc(u8, RECV_BUF_SIZE),
         .send_buf = try allocator.alloc(u8, SEND_BUF_SIZE),
         .map_ptr = &server.*.routes,
-        .pages_directory = &server.*.pages_directory,
+        .index_file_content = try allocator.dupe(u8, server.*.index_file_content),
+        // .pages_directory = &server.*.pages_directory,
     };
 }
 
@@ -107,9 +108,19 @@ pub fn dispatchRequest(self: *Self, request: *Request) !void {
 
         // I really hate this
         // because it forces users to have an index.html within their pages directory
-        const tmplt_str = try self.pages_directory.*.readFileAlloc(self.allocator, "index.html", 1024 * 64);
-        var tmpl = FullPageRefreshTemplate.init(.{ .route_content = try writer.toOwnedSlice() });
-        const render = try tmpl.render(self.allocator, tmplt_str, .{});
+        // const tmplt_str = try self.pages_directory.*.readFileAlloc(self.allocator, "index.html", 1024 * 64);
+        const content =
+            try writer.toOwnedSlice();
+        log.warn(
+            \\ WRITER: {s}
+            \\ RENDERING TO: {s}
+        , .{
+            // writer.written(),
+            content,
+            self.index_file_content,
+        });
+        var tmpl = FullPageRefreshTemplate.init(.{ .route_content = content });
+        const render = try tmpl.render(self.allocator, self.index_file_content, .{});
 
         try writer.writer.writeAll(render);
     }
