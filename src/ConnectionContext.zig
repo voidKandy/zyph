@@ -106,19 +106,7 @@ pub fn dispatchRequest(self: *Self, request: *Request) !void {
             \\ requires full page refresh
         , .{});
 
-        // I really hate this
-        // because it forces users to have an index.html within their pages directory
-        // const tmplt_str = try self.pages_directory.*.readFileAlloc(self.allocator, "index.html", 1024 * 64);
-        const content =
-            try writer.toOwnedSlice();
-        log.warn(
-            \\ WRITER: {s}
-            \\ RENDERING TO: {s}
-        , .{
-            // writer.written(),
-            content,
-            self.index_file_content,
-        });
+        const content = try writer.toOwnedSlice();
         var tmpl = FullPageRefreshTemplate.init(.{ .route_content = content });
         const render = try tmpl.render(self.allocator, self.index_file_content, .{});
 
