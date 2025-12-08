@@ -38,9 +38,6 @@ pub fn init(
         if (amt <= 0) break;
     }
     const index_file_content = a.dupe(u8, dest_buffer[0..amt_read]) catch @panic("out of memory");
-    log.warn(
-        \\ INDEX FILE: {s}
-    , .{index_file_content});
     return .{
         .routes = RouteMap.init(a),
         .index_file_content = index_file_content,
