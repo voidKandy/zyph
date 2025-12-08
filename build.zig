@@ -1,11 +1,5 @@
 const std = @import("std");
 
-// Although this function looks imperative, it does not perform the build
-// directly and instead it mutates the build graph (`b`) that will be then
-// executed by an external runner. The functions in `std.Build` implement a DSL
-// for defining build steps and express dependencies between them, allowing the
-// build runner to parallelize the build automatically (and the cache system to
-// know when a step doesn't need to be re-run).
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -22,7 +16,9 @@ pub fn build(b: *std.Build) void {
     mod.addImport("tls", tls.module("tls"));
     mod.addImport("zemplate", zemplate.module("zemplate"));
 
-    buildBinaries(b, target, optimize, mod);
+    buildExamples(b, target, optimize, mod) catch |e| {
+        std.log.err("Failed to build examples: {any}", .{e});
+    };
 
     const lib_unit_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -43,21 +39,27 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_lib_unit_tests.step);
 }
 
-fn buildBinaries(b: *std.Build, target: std.Build.ResolvedTarget, opt: std.builtin.OptimizeMode, core_lib: *std.Build.Module) void {
-    const bins_dir = "examples";
-    const dir = std.fs.cwd().openDir(bins_dir, .{}) catch @panic("Failed to get directory");
+fn buildExamples(b: *std.Build, target: std.Build.ResolvedTarget, opt: std.builtin.OptimizeMode, core_lib: *std.Build.Module) anyerror!void {
+    const examples_dir = "examples";
+    const dir = std.fs.cwd().openDir(examples_dir, .{}) catch |e| {
+        std.log.err("Failed to get examples: {s}\nError: {any}", .{ examples_dir, e });
+        return e;
+    };
     var buffer: [256]u8 = undefined;
     @memset(&buffer, 0);
     var fba = std.heap.FixedBufferAllocator.init(&buffer);
     var iter = dir.iterate();
-    while (iter.next() catch |e| std.debug.panic("Dir iterator failure: {}\n", .{e})) |f| {
+    while (iter.next() catch |e| {
+        std.log.err("Dir iterator failure: {}\n", .{e});
+        return e;
+    }) |f| {
         const name = name: {
             var split = std.mem.splitBackwardsScalar(u8, f.name, '.');
             _ = split.first();
             break :name split.next() orelse @panic("malformed bin file name");
         };
 
-        const fullpath = std.fmt.allocPrint(fba.allocator(), "{s}/{s}", .{ bins_dir, f.name }) catch |e| std.debug.panic("Failed to get full path: {}\n", .{e});
+        const fullpath = std.fmt.allocPrint(fba.allocator(), "{s}/{s}", .{ examples_dir, f.name }) catch |e| std.debug.panic("Failed to get full path: {}\n", .{e});
         const exe = b.addExecutable(.{
             .name = name,
             .root_module = b.createModule(.{
@@ -69,7 +71,7 @@ fn buildBinaries(b: *std.Build, target: std.Build.ResolvedTarget, opt: std.built
 
         exe.root_module.addImport("core", core_lib);
 
-        b.installArtifact(exe);
+        // b.installArtifact(exe);
         const run = b.addRunArtifact(exe);
         const step = b.step(name, f.name);
         step.dependOn(&run.step);
