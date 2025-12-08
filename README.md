@@ -12,11 +12,14 @@
 
 ### Features:
 + File server
++ Hot reloading components
 + Opt-in TLS support
 + Bespoke web-components management system
 + Differientiation of Data and Hypermedia [Apis](https://htmx.org/essays/hypermedia-apis-vs-data-apis/)
 
 ### In the works
+- [ ] Hot reloading pages
+- [ ] Hot reloading File Server
 - [ ] Middleware
 - [ ] Utilizing caching for optimization
 
