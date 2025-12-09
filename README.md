@@ -4,7 +4,6 @@
 ### Why use zyph?
 + The needs of your website are fairly simple and can be easily modeled with hypermedia
 + You want to write zig
-+ You want to try out a new way of thinking about how to model a server
 + You want a small, fast server
 
 ### Why not use zyph?
