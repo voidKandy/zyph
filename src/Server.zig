@@ -70,8 +70,6 @@ pub fn withTls(self: *Self, dir: std.fs.Dir, cert_path: []const u8, key_path: []
     self.tls_auth = auth;
 }
 
-pub const HYDRATION_MIDDLEWARE_NAME = "hydration";
-
 pub fn startServer(self: *Self, addr: std.net.Address, opts: std.net.Address.ListenOptions) !void {
     self.server = try std.net.Address.listen(addr, opts);
 }

@@ -87,7 +87,7 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn registerHypermediaEndpoint(self: *Self, path: []const u8, middlewares: ?RouteMiddlewareInfo, instance: *anyopaque, func: anytype) !void {
-    validateHypermediaEndpointRegisterArgs(func);
+    root.validateFunctionType(func, HypermediaRouteFunc);
     if (path.len == 0) {
         return error.EmptyPath;
     }
@@ -106,7 +106,7 @@ pub fn registerHypermediaEndpoint(self: *Self, path: []const u8, middlewares: ?R
 }
 
 pub fn registerDataEndpoint(self: *Self, path: []const u8, middlewares: ?RouteMiddlewareInfo, instance: *anyopaque, func: anytype) !void {
-    validateDataEndpointRegisterArgs(func);
+    root.validateFunctionType(func, DataRouteFunc);
     if (path.len == 0) {
         return error.EmptyPath;
     }
@@ -122,92 +122,4 @@ pub fn registerDataEndpoint(self: *Self, path: []const u8, middlewares: ?RouteMi
             .func_ptr = @intFromPtr(func),
         } },
     });
-}
-
-inline fn validateHypermediaEndpointRegisterArgs(func: anytype) void {
-    comptime {
-        const func_info = @typeInfo(@TypeOf(func));
-
-        const f = blk: {
-            if (func_info == .pointer) {
-                const inner = @typeInfo(func_info.pointer.child);
-                if (inner == .@"fn") {
-                    break :blk inner.@"fn";
-                }
-            }
-            @compileError("Expected func to be a function pointer. Found " ++
-                @typeName(@TypeOf(func)));
-        };
-
-        if (f.params.len != 4) {
-            @compileError("Expected func to have three parameters");
-        }
-
-        const arg_2_type = f.params[1].type.?;
-        if (arg_2_type != std.mem.Allocator) {
-            @compileError("Expected func's second argument to be of type Allocator. Found " ++
-                @typeName(arg_2_type));
-        }
-
-        const arg_3_type = f.params[2].type.?;
-        if (arg_3_type != Request) {
-            @compileError("Expected func's third argument to be of type Request. Found " ++
-                @typeName(arg_2_type));
-        }
-
-        const arg_4_type = f.params[3].type.?;
-        if (arg_4_type != *std.Io.Writer) {
-            @compileError("Expected func's fourth argument to be of type *std.Io.Writer. Found " ++
-                @typeName(arg_3_type));
-        }
-
-        if (!ret: {
-            const ret_info = @typeInfo(f.return_type orelse break :ret false);
-            const set = ret_info.error_union.error_set;
-            const payload = ret_info.error_union.payload;
-
-            break :ret (payload == void and set == anyerror);
-        }) {
-            @compileError("Expected func's return type to be anyerror!void. Found " ++
-                @typeName(f.return_type.?));
-        }
-    }
-}
-
-inline fn validateDataEndpointRegisterArgs(func: anytype) void {
-    comptime {
-        const func_info = @typeInfo(@TypeOf(func));
-
-        const f = blk: {
-            if (func_info == .pointer) {
-                const inner = @typeInfo(func_info.pointer.child);
-                if (inner == .@"fn") {
-                    break :blk inner.@"fn";
-                }
-            }
-            @compileError("Expected func to be a function pointer. Found " ++
-                @typeName(@TypeOf(func)));
-        };
-
-        if (f.params.len != 2) {
-            @compileError("Expected func to have three parameters");
-        }
-
-        const arg_2_type = f.params[1].type.?;
-        if (arg_2_type != *Request) {
-            @compileError("Expected func's second argument to be of type *Request. Found " ++
-                @typeName(arg_2_type));
-        }
-
-        if (!ret: {
-            const ret_info = @typeInfo(f.return_type orelse break :ret false);
-            const set = ret_info.error_union.error_set;
-            const payload = ret_info.error_union.payload;
-
-            break :ret (payload == void and set == anyerror);
-        }) {
-            @compileError("Expected func's return type to be anyerror!void. Found " ++
-                @typeName(f.return_type.?));
-        }
-    }
 }

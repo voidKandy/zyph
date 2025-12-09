@@ -43,7 +43,7 @@ pub fn main() !void {
     var hydration_context = try zyph.hydration_middleware.Context.init(allocator, server.index_file_content);
     defer hydration_context.deinit(allocator);
     try server.middlewares.put(
-        "hydration",
+        zyph.hydration_middleware.NAME,
         zyph.Middleware.init(.post, &hydration_context, &zyph.hydration_middleware.handler),
     );
 
@@ -51,7 +51,7 @@ pub fn main() !void {
 
     try server.routes.registerHypermediaEndpoint("/", .{
         .pre = &.{"logger"},
-        .post = &.{"hydration"},
+        .post = &.{zyph.hydration_middleware.NAME},
     }, &.{}, &Route.handler);
 
     var env_map = try std.process.getEnvMap(allocator);

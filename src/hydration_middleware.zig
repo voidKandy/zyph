@@ -7,6 +7,7 @@ const log = std.log.scoped(.hydration_middleware);
 
 const FullPageRefreshTemplate = zemplate.Template(struct { route_content: []const u8 });
 
+pub const NAME = "hydration";
 pub const Context = struct {
     index_file_content: []u8,
 
