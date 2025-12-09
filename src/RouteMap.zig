@@ -1,5 +1,6 @@
 const std = @import("std");
 const log = std.log.scoped(.RouteMap);
+const root = @import("root.zig");
 const Request = std.http.Server.Request;
 
 /// Hypermedia Route takes a writer which it writes HTML to
@@ -53,7 +54,19 @@ const RouteFunc = union(enum) {
     }
 };
 
-map: std.StringHashMap(RouteFunc),
+const RouteMiddlewareInfo = struct {
+    pre: ?[]const []const u8 = null,
+    post: ?[]const []const u8 = null,
+};
+
+const RouteData = struct {
+    middlewares: ?RouteMiddlewareInfo,
+    func: RouteFunc,
+};
+
+const Map = std.StringHashMap(RouteData);
+
+map: Map,
 notFound: NotFoundFunc = struct {
     fn handler(_: Request, w: *std.Io.Writer) anyerror!void {
         try w.writeAll(
@@ -65,7 +78,7 @@ notFound: NotFoundFunc = struct {
 const Self = @This();
 pub fn init(a: std.mem.Allocator) Self {
     return .{
-        .map = std.StringHashMap(RouteFunc).init(a),
+        .map = Map.init(a),
     };
 }
 
@@ -73,7 +86,7 @@ pub fn deinit(self: *Self) void {
     self.map.deinit();
 }
 
-pub fn registerHypermediaEndpoint(self: *Self, path: []const u8, instance: *anyopaque, func: anytype) !void {
+pub fn registerHypermediaEndpoint(self: *Self, path: []const u8, middlewares: ?RouteMiddlewareInfo, instance: *anyopaque, func: anytype) !void {
     validateHypermediaEndpointRegisterArgs(func);
     if (path.len == 0) {
         return error.EmptyPath;
@@ -83,13 +96,16 @@ pub fn registerHypermediaEndpoint(self: *Self, path: []const u8, instance: *anyo
         return error.AlreadyExists;
     }
 
-    try self.map.put(path, RouteFunc{ .hypermedia = .{
-        .state_ptr = @intFromPtr(instance),
-        .func_ptr = @intFromPtr(func),
-    } });
+    try self.map.put(path, .{
+        .middlewares = middlewares,
+        .func = RouteFunc{ .hypermedia = .{
+            .state_ptr = @intFromPtr(instance),
+            .func_ptr = @intFromPtr(func),
+        } },
+    });
 }
 
-pub fn registerDataEndpoint(self: *Self, path: []const u8, instance: *anyopaque, func: anytype) !void {
+pub fn registerDataEndpoint(self: *Self, path: []const u8, middlewares: ?RouteMiddlewareInfo, instance: *anyopaque, func: anytype) !void {
     validateDataEndpointRegisterArgs(func);
     if (path.len == 0) {
         return error.EmptyPath;
@@ -99,10 +115,13 @@ pub fn registerDataEndpoint(self: *Self, path: []const u8, instance: *anyopaque,
         return error.AlreadyExists;
     }
 
-    try self.map.put(path, RouteFunc{ .stateful = .{
-        .state_ptr = @intFromPtr(instance),
-        .func_ptr = @intFromPtr(func),
-    } });
+    try self.map.put(path, .{
+        .middlewares = middlewares,
+        .func = RouteFunc{ .data = .{
+            .state_ptr = @intFromPtr(instance),
+            .func_ptr = @intFromPtr(func),
+        } },
+    });
 }
 
 inline fn validateHypermediaEndpointRegisterArgs(func: anytype) void {

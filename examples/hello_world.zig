@@ -15,7 +15,7 @@ pub fn main() !void {
     var server = zyph.Server.init(allocator, try std.fs.cwd().openFile("test_pages/index.html", .{}), null);
     defer server.deinit();
 
-    try server.routes.registerHypermediaEndpoint("/", &.{}, &struct {
+    try server.registerHypermediaEndpoint("/", &.{}, &struct {
         fn handler(
             _: *@TypeOf(.{}),
             _: std.mem.Allocator,

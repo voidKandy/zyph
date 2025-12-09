@@ -16,7 +16,7 @@ allocator: std.mem.Allocator,
 recv_buf: []u8,
 send_buf: []u8,
 connection: ConnectionType,
-index_file_content: []u8,
+// index_file_content: []u8,
 server_ptr: *const Server,
 const Self = @This();
 
@@ -37,7 +37,7 @@ pub fn init(allocator: std.mem.Allocator, server: *const Server, conn: std.net.S
         .server_ptr = server,
         .recv_buf = try allocator.alloc(u8, RECV_BUF_SIZE),
         .send_buf = try allocator.alloc(u8, SEND_BUF_SIZE),
-        .index_file_content = try allocator.dupe(u8, server.*.index_file_content),
+        // .index_file_content = try allocator.dupe(u8, server.*.index_file_content),
     };
 }
 
@@ -58,102 +58,76 @@ pub fn deinit(self: *Self) void {
     self.allocator.free(self.send_buf);
 }
 
-pub fn dispatchRequest(self: *Self, request: *Request) !void {
-    const is_htmx_request = getHeader(request.*, "hx-request") != null;
-    const hydrated_info = getHeader(request.*, "x-hydrated");
+pub fn dispatchRequest(self: *Self, request: *Request) anyerror!void {
     const parts = parseRequestParts(&request.*);
-
-    log.debug(
-        \\ is htmx: {any}
-        \\ info: {s}
-    , .{ is_htmx_request, hydrated_info orelse "None" });
-
-    const oob_swap = if (hydrated_info == null) "innerHTML" else "beforeend";
 
     var writer = std.Io.Writer.Allocating.init(self.allocator);
     defer writer.deinit();
-    const func_opt = self.server_ptr.*.routes.map.get(parts.path);
+    const route_opt = self.server_ptr.*.routes.map.get(parts.path);
 
     log.debug(
-        \\ Got Function Pointer: {any}
-    , .{func_opt});
-    var not_found = func_opt == null;
+        \\ Got Route Data: {any}
+    , .{route_opt});
+    var not_found = route_opt == null;
 
-    // for (self.middlewares) |middleware| {}
+    if (route_opt) |route| {
+        const has_pre_mw = blk: {
+            break :blk (route.middlewares orelse break :blk false).pre != null;
+        };
+        const has_post_mw = blk: {
+            break :blk (route.middlewares orelse break :blk false).post != null;
+        };
+        if (has_pre_mw) {
+            for (route.middlewares.?.pre.?) |key| {
+                if (self.server_ptr.*.middlewares.get(key)) |m| {
+                    if (m.kind == .post) {
+                        log.err(
+                            \\ Middleware of .post type has been registered as a .pre type middleware!
+                        , .{});
+                        return error.MiddlewareInvalid;
+                    }
+                    m.call(self.allocator, request, &writer.writer) catch |e| {
+                        log.err(
+                            \\ Error in {any} middleware: {any}
+                        , .{ key, e });
+                        return e;
+                    };
+                }
+            }
+        }
 
-    if (func_opt) |func| {
-        func.call(self.allocator, request, &writer.writer) catch |e| {
+        route.func.call(self.allocator, request, &writer.writer) catch |e| {
             log.err(
                 \\ Error in route function: {any}
             , .{e});
             not_found = e == error.NotFound;
         };
 
-        switch (func) {
-            .data => if (!not_found) return,
-            else => {},
+        if (route.func == .data and !not_found) return;
+
+        if (not_found) {
+            try self.server_ptr.*.routes.notFound(request.*, &writer.writer);
         }
-    }
 
-    if (not_found) {
-        try self.server_ptr.*.routes.notFound(request.*, &writer.writer);
-    }
-
-    if (!is_htmx_request) {
-        log.debug(
-            \\ requires full page refresh
-        , .{});
-
-        const content = try writer.toOwnedSlice();
-        var tmpl = FullPageRefreshTemplate.init(.{ .route_content = content });
-        const render = try tmpl.render(self.allocator, self.index_file_content, .{});
-
-        try writer.writer.writeAll(render);
-    }
-
-    const hydration_html = blk: {
-        var component_buffer = std.ArrayList(u8).initCapacity(self.allocator, 1024) catch @panic("out of memory");
-        component_buffer.appendSlice(self.allocator, std.fmt.allocPrint(self.allocator,
-            \\  <section id="components-cache" hx-swap-oob="{s}">
-        , .{oob_swap}) catch @panic("out of memory")) catch @panic("out of memory");
-        ComponentsDirectory.tryUpdate() catch |e| log.err("Failed to update components directory: {any}\n", .{e});
-        var map = try ComponentsDirectory.get().map.clone();
-
-        if (hydrated_info) |header| {
-            var header_elems = std.mem.splitScalar(u8, std.mem.trim(u8, header, "\n []"), ',');
-            while (header_elems.next()) |elem_name| {
-                const sanitized = std.mem.trim(u8, elem_name, "\n \"");
-                if (sanitized.len == 0) continue;
-                const hash = std.hash_map.hashString(sanitized);
-                log.debug("removing {s} : {d}\n", .{ sanitized, hash });
-                const removed = map.remove(std.hash_map.hashString(sanitized));
-                if (!removed)
-                    log.warn("failed to remove {s}\n", .{sanitized});
+        if (has_post_mw) {
+            for (route.middlewares.?.post.?) |key| {
+                if (self.server_ptr.*.middlewares.get(key)) |m| {
+                    if (m.kind == .pre) {
+                        log.err(
+                            \\ Middleware of .pre type has been registered as a .post type middleware!
+                        , .{});
+                        return error.MiddlewareInvalid;
+                    }
+                    m.call(self.allocator, request, &writer.writer) catch |e| {
+                        log.err(
+                            \\ Error in {any} middleware: {any}
+                        , .{ key, e });
+                        return e;
+                    };
+                }
             }
         }
-
-        var needed_iter = map.valueIterator();
-        var included_counter: usize = 0;
-        while (needed_iter.next()) |comp| {
-            const needle =
-                try std.fmt.allocPrint(self.allocator, "<{s}", .{comp.name});
-            if (std.mem.indexOf(u8, writer.written(), needle) != null) {
-                log.debug("including {s}\n", .{comp.name});
-                try component_buffer.appendSlice(self.allocator, comp.content);
-                included_counter += 1;
-            }
-        }
-
-        if (included_counter == 0) {
-            component_buffer.deinit(self.allocator);
-            break :blk "";
-        }
-        component_buffer.appendSlice(self.allocator,
-            \\  </section>
-        ) catch @panic("out of memory");
-        break :blk try component_buffer.toOwnedSlice(self.allocator);
-    };
-    try writer.writer.writeAll(hydration_html);
+    }
 
     try request.respond(try writer.toOwnedSlice(), .{
         .keep_alive = true,
@@ -228,7 +202,7 @@ pub fn handleConnection(self: *Self) !void {
     }
 }
 
-fn serveHTTP(self: *Self, server: *std.http.Server, request: *Request) !void {
+fn serveHTTP(self: *Self, server: *std.http.Server, request: *Request) anyerror!void {
     var body: ?[]u8 = null;
     if (self.server_ptr.*.files == null) {
         log.debug(
