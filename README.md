@@ -26,3 +26,26 @@
 
 ### Running Examples
 All binaries in the `examples` file can be run with the command `zig build <name-of-example-file>` for example, `examples/hello_world.zig` can be run with `zig build hello_world`.
+
+
+## Usage
+`zyph` is best used with [HTMX](https://htmx.org/).
+In order for hydration to work, your `index.html` file *must* have this script **in** the `body` tag:
+```html
+<script>
+  document.body.addEventListener("htmx:beforeRequest", (event) => {
+    const children = document.querySelector("#components-cache").children;
+    const set = new Set();
+    for (const el of children) {
+      if (el instanceof HTMLScriptElement) {
+        continue;
+      }
+      const cleanName = el.id.replace(/-template$/, "");
+      if (cleanName.trim().length > 0) {
+        set.add(cleanName);
+      }
+    }
+    event.detail.xhr.setRequestHeader("x-hydrated", JSON.stringify([...set]))
+  });
+</script>
+```
