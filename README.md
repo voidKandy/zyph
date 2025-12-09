@@ -29,6 +29,8 @@ All binaries in the `examples` file can be run with the command `zig build <name
 
 ## Usage
 `zyph` is best used with [HTMX](https://htmx.org/).
+
+
 In order for hydration to work, your `index.html` file *must* have this script **in** the `body` tag:
 ```html
 <script>
