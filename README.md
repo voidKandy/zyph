@@ -77,7 +77,20 @@ An example of a `pre` middleware would be some _auth_ middleware; you want it be
 
 An example of a `post` middleware would be the hydration middleware `zyph` provides. It needs to be called _after_ the handler because it needs to introspect into what the handler wrote to the writer.
 
-Adding middleware to a route is simple, given that `route_handle` was returned by the `register` function:
+Before it can be associated with a route, middleware must be initialized and registered in the `Server`, it's very similar to how routes are created:
+```zig
+try server.middlewares.put(
+    "logger",
+    zyph.Middleware.init(.pre, &.{}, &struct {
+        fn middleware(_: *@TypeOf(.{}), a: std.mem.Allocator, r: *std.http.Server.Request, w: *std.Io.Writer) anyerror!void {
+            _ = w;
+            _ = a;
+            std.log.scoped(.inside_logger_middleware).warn("Request from middleware: {any}", .{r});
+        }
+    }.middleware),
+);
+```
+Once middleware has been registered on the server, adding middleware to a route is simple, given that `route_handle` was returned by the `register` function:
 ```zig
 try route_handle.addMiddlwares(.pre, &.{"some_pre_middleware", "another_pre_middleware"});
 try route_handle.addMiddlwares(.post, &.{"some_post_middleware", "another_post_middleware"});
