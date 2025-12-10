@@ -98,7 +98,7 @@ try route_handle.addMiddlwares(.post, &.{"some_post_middleware", "another_post_m
 Middlewares will be executed in the order they are passed in this function.
 
 ## zyph's hydration middleware
-`zyph` provides a hydration middleware that hydrates the client with whichever web component they need. Wherever you create your server and register your routes, call:
+`zyph` provides a hydration middleware that hydrates the client with whichever web components they need. Wherever you create your server and register your routes, call:
 ```zig
 var hydration_context = try zyph.hydration_middleware.Context.init(allocator, try std.fs.cwd().openFile("path/to/index.html", .{}));
 defer hydration_context.deinit(allocator);
