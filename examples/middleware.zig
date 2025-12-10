@@ -27,7 +27,7 @@ pub fn main() !void {
 
     const allocator = gpa.allocator();
 
-    var server = zyph.Server.init(allocator, try std.fs.cwd().openFile("test_pages/index.html", .{}), null);
+    var server = zyph.Server.init(allocator, null);
 
     try server.middlewares.put(
         "logger",
@@ -40,7 +40,7 @@ pub fn main() !void {
         }.middleware),
     );
 
-    var hydration_context = try zyph.hydration_middleware.Context.init(allocator, server.index_file_content);
+    var hydration_context = try zyph.hydration_middleware.Context.init(allocator, try std.fs.cwd().openFile("test_pages/index.html", .{}));
     defer hydration_context.deinit(allocator);
     try server.middlewares.put(
         zyph.hydration_middleware.NAME,
@@ -49,10 +49,9 @@ pub fn main() !void {
 
     defer server.deinit();
 
-    try server.routes.registerHypermediaEndpoint("/", .{
-        .pre = &.{"logger"},
-        .post = &.{zyph.hydration_middleware.NAME},
-    }, &.{}, &Route.handler);
+    const home_route = try server.registerHypermediaEndpoint("/", &.{}, &Route.handler);
+    try home_route.addMiddlewares(.pre, &.{"logger"});
+    try home_route.addMiddlewares(.post, &.{zyph.hydration_middleware.NAME});
 
     var env_map = try std.process.getEnvMap(allocator);
     defer env_map.deinit();

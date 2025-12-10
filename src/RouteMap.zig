@@ -16,13 +16,13 @@ pub const DataRouteFunc = *fn (
     *const anyopaque,
     *Request,
 ) anyerror!void;
-/// Not found function should be considered a hypermedia route
+
 pub const NotFoundFunc = *const fn (
     Request,
     *std.Io.Writer,
 ) anyerror!void;
 
-const RouteFunc = union(enum) {
+pub const RouteFunc = union(enum) {
     const Pointers = struct {
         state_ptr: usize,
         func_ptr: usize,
@@ -58,13 +58,22 @@ const RouteMiddlewareInfo = struct {
     pre: ?[]const []const u8 = null,
     post: ?[]const []const u8 = null,
 };
+const NewRouteMiddlewareInfo = struct {
+    pre: std.SinglyLinkedList = std.SinglyLinkedList{},
+    post: std.SinglyLinkedList = std.SinglyLinkedList{},
+};
 
-const RouteData = struct {
-    middlewares: ?RouteMiddlewareInfo,
+pub const MiddlewareItem = struct {
+    node: std.SinglyLinkedList.Node,
+    name: []const u8,
+};
+
+pub const RouteData = struct {
+    middlewares: NewRouteMiddlewareInfo = .{},
     func: RouteFunc,
 };
 
-const Map = std.StringHashMap(RouteData);
+const Map = std.StringHashMapUnmanaged(RouteData);
 
 map: Map,
 notFound: NotFoundFunc = struct {
@@ -76,50 +85,13 @@ notFound: NotFoundFunc = struct {
 }.handler,
 
 const Self = @This();
-pub fn init(a: std.mem.Allocator) Self {
+pub fn init() Self {
     return .{
-        .map = Map.init(a),
+        .map = Map{},
     };
 }
 
-pub fn deinit(self: *Self) void {
-    self.map.deinit();
-}
-
-pub fn registerHypermediaEndpoint(self: *Self, path: []const u8, middlewares: ?RouteMiddlewareInfo, instance: *anyopaque, func: anytype) !void {
-    root.validateFunctionType(func, HypermediaRouteFunc);
-    if (path.len == 0) {
-        return error.EmptyPath;
-    }
-
-    if (self.map.contains(path)) {
-        return error.AlreadyExists;
-    }
-
-    try self.map.put(path, .{
-        .middlewares = middlewares,
-        .func = RouteFunc{ .hypermedia = .{
-            .state_ptr = @intFromPtr(instance),
-            .func_ptr = @intFromPtr(func),
-        } },
-    });
-}
-
-pub fn registerDataEndpoint(self: *Self, path: []const u8, middlewares: ?RouteMiddlewareInfo, instance: *anyopaque, func: anytype) !void {
-    root.validateFunctionType(func, DataRouteFunc);
-    if (path.len == 0) {
-        return error.EmptyPath;
-    }
-
-    if (self.map.contains(path)) {
-        return error.AlreadyExists;
-    }
-
-    try self.map.put(path, .{
-        .middlewares = middlewares,
-        .func = RouteFunc{ .data = .{
-            .state_ptr = @intFromPtr(instance),
-            .func_ptr = @intFromPtr(func),
-        } },
-    });
+/// Must be deinitialized with the allocator that created middlewares
+pub fn deinit(self: *Self, a: std.mem.Allocator) void {
+    self.map.deinit(a);
 }

@@ -1,4 +1,5 @@
 const std = @import("std");
+const root = @import("root.zig");
 const tls = @import("tls");
 const log = std.log.scoped(.Server);
 const RouteMap = @import("RouteMap.zig");
@@ -18,32 +19,14 @@ allocator: std.mem.Allocator,
 tls_auth: ?*tls.config.CertKeyPair = null,
 server: std.net.Server = undefined,
 
-/// Additional Options
-///
-/// The entrypoint of the Hypermedia App
-index_file_content: []u8,
-
 const Self = @This();
 
 pub fn init(
     a: std.mem.Allocator,
-    index_file: std.fs.File,
     file_server_dir: ?std.fs.Dir,
 ) Self {
-    // // @import("components.zig").ComponentsDirectory.init(a);
-    var reader_buffer: [1024 * 64]u8 = undefined;
-    var reader = index_file.reader(&reader_buffer);
-    var dest_buffer: [1024 * 64]u8 = undefined;
-    var amt_read: usize = 0;
-    while (true) {
-        const amt = reader.readPositional(&dest_buffer) catch |e| if (e == error.EndOfStream) break else @panic("failed to read index file");
-        amt_read += amt;
-        if (amt <= 0) break;
-    }
-    const index_file_content = a.dupe(u8, dest_buffer[0..amt_read]) catch @panic("out of memory");
     return .{
-        .routes = RouteMap.init(a),
-        .index_file_content = index_file_content,
+        .routes = RouteMap.init(),
         .files = if (file_server_dir) |d| FileServer.init(.{
             .allocator = a,
             .root_dir = d,
@@ -54,13 +37,11 @@ pub fn init(
 }
 
 pub fn deinit(self: *Self) void {
-    // @import("components.zig").ComponentsDirectory.deinit();
-    self.routes.deinit();
+    self.routes.deinit(self.allocator);
     if (self.tls_auth) |a| {
         a.deinit(self.allocator);
         self.allocator.destroy(a);
     }
-    self.allocator.free(self.index_file_content);
     defer self.server.deinit();
 }
 
@@ -115,4 +96,69 @@ pub fn listen(self: *Self) !void {
 
         thread.detach();
     }
+}
+
+pub const RouteHandler = struct {
+    data: *RouteMap.RouteData,
+    server_ptr: *Self,
+
+    pub fn addMiddlewares(self: @This(), kind: Middleware.Kind, names: []const []const u8) std.mem.Allocator.Error!void {
+        for (names) |name| {
+            const item = try self.server_ptr.*.allocator.create(RouteMap.MiddlewareItem);
+            item.* = RouteMap.MiddlewareItem{
+                .name = name,
+                .node = std.SinglyLinkedList.Node{},
+            };
+            switch (kind) {
+                .pre => self.data.*.middlewares.pre.prepend(&item.node),
+                .post => self.data.*.middlewares.post.prepend(&item.node),
+            }
+        }
+    }
+};
+
+pub fn registerHypermediaEndpoint(self: *Self, path: []const u8, instance: *anyopaque, func: anytype) !RouteHandler {
+    root.validateFunctionType(func, RouteMap.HypermediaRouteFunc);
+    if (path.len == 0) {
+        return error.EmptyPath;
+    }
+
+    if (self.routes.map.contains(path)) {
+        return error.AlreadyExists;
+    }
+
+    try self.routes.map.put(self.allocator, path, .{
+        .func = RouteMap.RouteFunc{ .hypermedia = .{
+            .state_ptr = @intFromPtr(instance),
+            .func_ptr = @intFromPtr(func),
+        } },
+    });
+
+    return .{
+        .data = self.routes.map.getPtr(path).?,
+        .server_ptr = self,
+    };
+}
+
+pub fn registerDataEndpoint(self: *Self, path: []const u8, instance: *anyopaque, func: anytype) !RouteHandler {
+    root.validateFunctionType(func, RouteMap.DataRouteFunc);
+    if (path.len == 0) {
+        return error.EmptyPath;
+    }
+
+    if (self.routes.map.contains(path)) {
+        return error.AlreadyExists;
+    }
+
+    try self.routes.map.put(self.allocator, path, .{
+        .func = RouteMap.RouteFunc{ .data = .{
+            .state_ptr = @intFromPtr(instance),
+            .func_ptr = @intFromPtr(func),
+        } },
+    });
+
+    return .{
+        .data = self.routes.map.getPtr(path).?,
+        .server_ptr = self,
+    };
 }

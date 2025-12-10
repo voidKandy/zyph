@@ -16,7 +16,6 @@ allocator: std.mem.Allocator,
 recv_buf: []u8,
 send_buf: []u8,
 connection: ConnectionType,
-// index_file_content: []u8,
 server_ptr: *const Server,
 const Self = @This();
 
@@ -37,7 +36,6 @@ pub fn init(allocator: std.mem.Allocator, server: *const Server, conn: std.net.S
         .server_ptr = server,
         .recv_buf = try allocator.alloc(u8, RECV_BUF_SIZE),
         .send_buf = try allocator.alloc(u8, SEND_BUF_SIZE),
-        // .index_file_content = try allocator.dupe(u8, server.*.index_file_content),
     };
 }
 
@@ -60,6 +58,7 @@ pub fn deinit(self: *Self) void {
 
 pub fn dispatchRequest(self: *Self, request: *Request) anyerror!void {
     const parts = parseRequestParts(&request.*);
+    _ = request.iterateHeaders();
 
     var writer = std.Io.Writer.Allocating.init(self.allocator);
     defer writer.deinit();
@@ -70,29 +69,26 @@ pub fn dispatchRequest(self: *Self, request: *Request) anyerror!void {
     , .{route_opt});
     var not_found = route_opt == null;
 
+    var current_post_mw: ?*std.SinglyLinkedList.Node = null;
     if (route_opt) |route| {
-        const has_pre_mw = blk: {
-            break :blk (route.middlewares orelse break :blk false).pre != null;
-        };
-        const has_post_mw = blk: {
-            break :blk (route.middlewares orelse break :blk false).post != null;
-        };
-        if (has_pre_mw) {
-            for (route.middlewares.?.pre.?) |key| {
-                if (self.server_ptr.*.middlewares.get(key)) |m| {
-                    if (m.kind == .post) {
-                        log.err(
-                            \\ Middleware of .post type has been registered as a .pre type middleware!
-                        , .{});
-                        return error.MiddlewareInvalid;
-                    }
-                    m.call(self.allocator, request, &writer.writer) catch |e| {
-                        log.err(
-                            \\ Error in {any} middleware: {any}
-                        , .{ key, e });
-                        return e;
-                    };
+        var current_pre_mw = route.middlewares.pre.first;
+        current_post_mw = route.middlewares.post.first;
+
+        while (current_pre_mw) |item| : (current_pre_mw = item.next) {
+            const parent: *RouteMap.MiddlewareItem = @fieldParentPtr("node", item);
+            if (self.server_ptr.*.middlewares.get(parent.name)) |m| {
+                if (m.kind == .post) {
+                    log.err(
+                        \\ Middleware of .post type has been registered as a .pre type middleware!
+                    , .{});
+                    return error.MiddlewareInvalid;
                 }
+                m.call(self.allocator, request, &writer.writer) catch |e| {
+                    log.err(
+                        \\ Error in {any} middleware: {any}
+                    , .{ parent.name, e });
+                    return e;
+                };
             }
         }
 
@@ -100,32 +96,35 @@ pub fn dispatchRequest(self: *Self, request: *Request) anyerror!void {
             log.err(
                 \\ Error in route function: {any}
             , .{e});
-            not_found = e == error.NotFound;
+            switch (e) {
+                error.NotFound => not_found = true,
+                error.Redirect => return,
+                else => return e,
+            }
         };
 
         if (route.func == .data and !not_found) return;
+    }
 
-        if (not_found) {
-            try self.server_ptr.*.routes.notFound(request.*, &writer.writer);
-        }
+    if (not_found) {
+        try self.server_ptr.*.routes.notFound(request.*, &writer.writer);
+    }
 
-        if (has_post_mw) {
-            for (route.middlewares.?.post.?) |key| {
-                if (self.server_ptr.*.middlewares.get(key)) |m| {
-                    if (m.kind == .pre) {
-                        log.err(
-                            \\ Middleware of .pre type has been registered as a .post type middleware!
-                        , .{});
-                        return error.MiddlewareInvalid;
-                    }
-                    m.call(self.allocator, request, &writer.writer) catch |e| {
-                        log.err(
-                            \\ Error in {any} middleware: {any}
-                        , .{ key, e });
-                        return e;
-                    };
-                }
+    while (current_post_mw) |item| : (current_post_mw = item.next) {
+        const parent: *RouteMap.MiddlewareItem = @fieldParentPtr("node", item);
+        if (self.server_ptr.*.middlewares.get(parent.name)) |m| {
+            if (m.kind == .pre) {
+                log.err(
+                    \\ Middleware of .pre type has been registered as a .post type middleware!
+                , .{});
+                return error.MiddlewareInvalid;
             }
+            m.call(self.allocator, request, &writer.writer) catch |e| {
+                log.err(
+                    \\ Error in {any} middleware: {any}
+                , .{ parent.name, e });
+                return e;
+            };
         }
     }
 
@@ -215,7 +214,7 @@ fn serveHTTP(self: *Self, server: *std.http.Server, request: *Request) anyerror!
         return;
     } else |e| switch (e) {
         error.FileNotFound => {
-            log.info(
+            log.warn(
                 \\ File server could not find: {s}
             , .{request.head.target});
         },

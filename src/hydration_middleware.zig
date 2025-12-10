@@ -11,10 +11,22 @@ pub const NAME = "hydration";
 pub const Context = struct {
     index_file_content: []u8,
 
-    pub fn init(a: std.mem.Allocator, index_file_content: []const u8) std.mem.Allocator.Error!@This() {
+    pub fn init(a: std.mem.Allocator, index_file: std.fs.File) std.mem.Allocator.Error!@This() {
         ComponentsDirectory.init(a);
+
+        var reader_buffer: [1024 * 64]u8 = undefined;
+        var reader = index_file.reader(&reader_buffer);
+        var dest_buffer: [1024 * 64]u8 = undefined;
+        var amt_read: usize = 0;
+        while (true) {
+            const amt = reader.readPositional(&dest_buffer) catch |e| if (e == error.EndOfStream) break else @panic("failed to read index file");
+            amt_read += amt;
+            if (amt <= 0) break;
+        }
+        const index_file_content = a.dupe(u8, dest_buffer[0..amt_read]) catch @panic("out of memory");
+
         return .{
-            .index_file_content = try a.dupe(u8, index_file_content),
+            .index_file_content = index_file_content,
         };
     }
     pub fn deinit(self: *@This(), a: std.mem.Allocator) void {

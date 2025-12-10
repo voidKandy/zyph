@@ -5,6 +5,8 @@ pub const cache = @import("cache.zig");
 pub const hydration_middleware = @import("hydration_middleware.zig");
 
 pub fn getHeader(r: std.http.Server.Request, key: []const u8) ?[]const u8 {
+    if (r.server.reader.state != .received_head)
+        std.debug.panic("Server reader in unexpected state {any}", .{r.server.reader.state});
     var iter = r.iterateHeaders();
 
     while (iter.next()) |h| {
