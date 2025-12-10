@@ -40,6 +40,7 @@ defer server.deinit();
 `Server` has two methods for registering routes:
 + `registerHypermediaEndpoint`
 + `registerDataEndpoint`
+
 Each are handled slightly differently on the server.
 The context types of the following examples can be any arbtrary type, as long as it's type matches the first argument in the function passed.
 ```zig
@@ -71,6 +72,7 @@ var route_handle = try server.registerDataEndpoint("/", &data_route_ctx, &struct
 There are two kinds of middleware:
 + `pre` handler - called before the handler function is called
 + `post` handler - called after the handler function is called
+
 An example of a `pre` middleware would be some _auth_ middleware; you want it before the handler in case you need to return `Unauthorized`. 
 An example of a `post` middleware would be the hydration middleware `zyph` provides. It needs to be called _after_ the handler because it needs to introspect into what the handler wrote to the writer.
 Adding middleware to a route is simple, given that `route_handle` was returned by the `register` function:
