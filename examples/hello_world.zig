@@ -12,10 +12,10 @@ pub fn main() !void {
     defer if (gpa.detectLeaks()) std.log.err("LEAKS DETECTED IN MAIN ALLOCATOR\n", .{});
 
     const allocator = gpa.allocator();
-    var server = zyph.Server.init(allocator, try std.fs.cwd().openFile("test_pages/index.html", .{}), null);
+    var server = zyph.Server.init(allocator, null);
     defer server.deinit();
 
-    try server.routes.registerHypermediaEndpoint("/", &.{}, &struct {
+    _ = try server.registerHypermediaEndpoint("/", &.{}, &struct {
         fn handler(
             _: *@TypeOf(.{}),
             _: std.mem.Allocator,
