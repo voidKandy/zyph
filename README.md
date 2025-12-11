@@ -60,7 +60,8 @@ var route_handle = try server.registerHypermediaEndpoint("/", &hypermedia_route_
 ```
 ```zig
 const data_route_ctx: @TypeOf(.{}) = .{};
-var route_handle = try server.registerDataEndpoint("/", &data_route_ctx, &struct {    fn handler(
+var route_handle = try server.registerDataEndpoint("/", &data_route_ctx, &struct {
+    fn handler(
         _: *@TypeOf(.{}),
         r: *std.http.Server.Request,
     ) anyerror!void {
