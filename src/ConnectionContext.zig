@@ -58,7 +58,8 @@ pub fn deinit(self: *Self) void {
 
 pub fn dispatchRequest(self: *Self, request: *Request) anyerror!void {
     const parts = parseRequestParts(&request.*);
-    _ = request.iterateHeaders();
+    // BAD?
+    // _ = request.iterateHeaders();
 
     var writer = std.Io.Writer.Allocating.init(self.allocator);
     defer writer.deinit();
