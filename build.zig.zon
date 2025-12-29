@@ -1,12 +1,12 @@
 .{
     .name = .zyph,
     .fingerprint = 0x12b05ca7fdb0a4cf,
-    .version = "0.2.1",
+    .version = "0.2.2",
     .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .zemplate = .{
-            .url = "git+https://github.com/voidKandy/zemplate#b74c7c9606ee0eb8451d184c6b9f86687ff141c8",
-            .hash = "zemplate-1.3.1-tSKpW9eaAAAL56lRVASiXU1J7I23wA1CLahsYgsaFQjk",
+            .url = "git+https://github.com/voidKandy/zemplate#d31c65b15c7cfc0ff25f9d362a75b7bb9b356f62",
+            .hash = "zemplate-1.3.2-tSKpW9rIAAAiT3yeTuHcejm2TNUgw94dAfCrkf-JYUgk",
         },
         .tls = .{
             .url = "git+https://github.com/ianic/tls.zig#9d56751c99267075908c63a8a91ffc1e7f252df4",
