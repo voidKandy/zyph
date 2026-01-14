@@ -5,7 +5,7 @@ const ComponentsDirectory = @import("components.zig").ComponentsDirectory;
 
 const log = std.log.scoped(.hydration_middleware);
 
-const FullPageRefreshTemplate = zemplate.Template(struct { route_content: []const u8 });
+const FullPageRefreshTemplate = struct { route_content: []const u8 };
 
 pub const NAME = "hydration";
 pub const Context = struct {
@@ -49,8 +49,16 @@ pub fn handler(ctx: *Context, a: std.mem.Allocator, r: *std.http.Server.Request,
             \\ requires full page refresh
         , .{});
 
-        var tmpl = FullPageRefreshTemplate.init(.{ .route_content = writer.buffer[0..writer.end] });
-        const render = try tmpl.render(a, ctx.index_file_content, .{});
+        var tmpl = try zemplate.Template.init(
+            a,
+            &FullPageRefreshTemplate{ .route_content = writer.buffer[0..writer.end] },
+        );
+        defer tmpl.deinit();
+        const render = try tmpl.render(
+            ctx.index_file_content,
+            .{},
+        );
+
         _ = writer.consumeAll();
         try writer.writeAll(render);
     }

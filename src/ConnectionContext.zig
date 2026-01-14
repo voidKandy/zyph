@@ -1,6 +1,5 @@
 const std = @import("std");
 const tls = @import("tls");
-const zemplate = @import("zemplate");
 const log = std.log.scoped(.ConnectionContext);
 const Server = @import("Server.zig");
 const FileServer = @import("FileServer.zig");
@@ -23,8 +22,6 @@ const ConnectionType = union(enum) {
     http: std.net.Server.Connection,
     https: *tls.Connection,
 };
-
-const FullPageRefreshTemplate = zemplate.Template(struct { route_content: []const u8 });
 
 const RECV_BUF_SIZE = 16 * 1024;
 const SEND_BUF_SIZE = 16 * 1024;
