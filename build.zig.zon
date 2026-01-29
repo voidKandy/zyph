@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .zemplate = .{
-            .url = "git+https://github.com/voidKandy/zemplate#b1b19a9ad5750b88cafbf586001da7dcd59bb553",
-            .hash = "zemplate-1.4.3-tSKpW-wdAQDhbkYA6oJf7Qp6ap7aXS-AloZ0HPfUe1L_",
+            .url = "git+https://github.com/voidKandy/zemplate#39bc091b4c47baecd6236c4f0c19f40ce6c89fd8",
+            .hash = "zemplate-1.5.1-tSKpW9tKAQDOruerwsqO5xtoUcuzs8bVRNgZYfOU5pBS",
         },
         .tls = .{
             .url = "git+https://github.com/ianic/tls.zig#9d56751c99267075908c63a8a91ffc1e7f252df4",
