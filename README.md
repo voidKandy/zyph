@@ -19,7 +19,7 @@
 
 ### In the works
 - [ ] Hot reloading pages
-- [ ] Hot reloading File Server
+- [x] Hot reloading File Server
 - [ ] Utilizing caching for optimization
 
 
