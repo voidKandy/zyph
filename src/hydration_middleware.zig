@@ -11,8 +11,8 @@ pub const NAME = "hydration";
 pub const Context = struct {
     index_file_content: []u8,
 
-    pub fn init(a: std.mem.Allocator, index_file: std.fs.File) std.mem.Allocator.Error!@This() {
-        ComponentsDirectory.init(a);
+    pub fn init(a: std.mem.Allocator, components_dir_path: []const u8, index_file: std.fs.File) std.mem.Allocator.Error!@This() {
+        ComponentsDirectory.init(a, components_dir_path);
 
         var reader_buffer: [1024 * 64]u8 = undefined;
         var reader = index_file.reader(&reader_buffer);
@@ -70,6 +70,7 @@ pub fn handler(ctx: *Context, a: std.mem.Allocator, r: *std.http.Server.Request,
         , .{oob_swap}) catch @panic("out of memory")) catch @panic("out of memory");
 
         ComponentsDirectory.tryUpdate() catch |e| log.err("Failed to update components directory: {any}\n", .{e});
+        // BAD? Map is cloned, Is this necessary?
         var map = try ComponentsDirectory.get().map.clone();
 
         if (hydrated_info) |header| {
@@ -88,10 +89,11 @@ pub fn handler(ctx: *Context, a: std.mem.Allocator, r: *std.http.Server.Request,
         var needed_iter = map.valueIterator();
         var included_counter: usize = 0;
         while (needed_iter.next()) |comp| {
-            const needle =
-                try std.fmt.allocPrint(a, "<{s}", .{comp.name});
+            var buf: [1024]u8 = undefined;
+            const name = @import("components.zig").componentName(comp.full_path, &buf) catch @panic("failed to create component name");
+            const needle = try std.fmt.allocPrint(a, "<{s}", .{name});
             if (std.mem.indexOf(u8, writer.buffer, needle) != null) {
-                log.debug("including {s}\n", .{comp.name});
+                log.debug("including {s}\n", .{name});
                 try component_buffer.appendSlice(a, comp.content);
                 included_counter += 1;
             }

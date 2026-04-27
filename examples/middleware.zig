@@ -40,7 +40,11 @@ pub fn main() !void {
         }.middleware),
     );
 
-    var hydration_context = try zyph.hydration_middleware.Context.init(allocator, try std.fs.cwd().openFile("test_pages/index.html", .{}));
+    var hydration_context = try zyph.hydration_middleware.Context.init(
+        allocator,
+        "components",
+        try std.fs.cwd().openFile("test_pages/index.html", .{}),
+    );
     defer hydration_context.deinit(allocator);
     try server.middlewares.put(
         zyph.hydration_middleware.NAME,

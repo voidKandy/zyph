@@ -2,11 +2,8 @@ const std = @import("std");
 const tls = @import("tls");
 const log = std.log.scoped(.ConnectionContext);
 const Server = @import("Server.zig");
-const FileServer = @import("FileServer.zig");
 const RouteMap = @import("RouteMap.zig");
 const Request = std.http.Server.Request;
-const Connection = std.net.Server.Connection;
-const getHeader = @import("root.zig").getHeader;
 const parseRequestParts = @import("root.zig").parseRequestParts;
 const ComponentsDirectory = @import("components.zig").ComponentsDirectory;
 

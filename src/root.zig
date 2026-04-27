@@ -4,6 +4,35 @@ pub const Middleware = @import("Middleware.zig");
 pub const cache = @import("cache.zig");
 pub const hydration_middleware = @import("hydration_middleware.zig");
 
+pub fn computeFolderMRC(path: []const u8) !u64 {
+    const cwd = std.fs.cwd();
+    var dir = try cwd.openDir(path, .{ .iterate = true });
+    defer dir.close();
+    return computeMRCIntoDir(dir);
+}
+
+fn computeMRCIntoDir(dir: std.fs.Dir) !u64 {
+    var latest: u64 = 0;
+    var it = dir.iterate();
+    while (try it.next()) |entry| {
+        switch (entry.kind) {
+            .file => {
+                const stat = try dir.statFile(entry.name);
+                const modified: u64 = @intCast(stat.mtime);
+                if (modified > latest) latest = modified;
+            },
+            .directory => {
+                var subdir = try dir.openDir(entry.name, .{ .iterate = true });
+                defer subdir.close();
+                const sub_mrc = try computeMRCIntoDir(subdir);
+                if (sub_mrc > latest) latest = sub_mrc;
+            },
+            else => continue,
+        }
+    }
+    return latest;
+}
+
 pub fn getHeader(r: std.http.Server.Request, key: []const u8) ?[]const u8 {
     if (r.server.reader.state != .received_head)
         std.debug.panic("Server reader in unexpected state {any}", .{r.server.reader.state});
