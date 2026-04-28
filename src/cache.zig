@@ -118,7 +118,7 @@ pub fn CachedDirectory(
                         try readFilesIntoMap(a, subdir, map, subdir_relative);
                     },
                     .file => {
-                        log.warn(
+                        log.debug(
                             \\ hashing '{s}'
                         , .{e.name});
                         const file = try dir.openFile(e.name, .{});
