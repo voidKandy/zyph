@@ -14,6 +14,8 @@ const ConnectionContext = @import("ConnectionContext.zig");
 ///
 middlewares: std.StringHashMap(Middleware),
 routes: RouteMap,
+/// keeping nullable for eventual userland configurability of presence of file server
+/// as well as configurability of file server directory
 files: ?FileServer,
 allocator: std.mem.Allocator,
 tls_auth: ?*tls.config.CertKeyPair = null,
@@ -23,14 +25,11 @@ const Self = @This();
 
 pub fn init(
     a: std.mem.Allocator,
-    file_server_dir: ?std.fs.Dir,
+    file_server_dir: ?[]const u8,
 ) Self {
     return .{
         .routes = RouteMap.init(),
-        .files = if (file_server_dir) |d| FileServer.init(.{
-            .allocator = a,
-            .root_dir = d,
-        }) catch @panic("failed to init file server") else null,
+        .files = if (file_server_dir) |dir| FileServer.init(a, dir) catch @panic("OOM") else null,
         .allocator = a,
         .middlewares = std.StringHashMap(Middleware).init(a),
     };

@@ -19,7 +19,7 @@
 
 ### In the works
 - [ ] Hot reloading pages
-- [ ] Hot reloading File Server
+- [x] Hot reloading File Server
 - [ ] Utilizing caching for optimization
 
 
@@ -101,7 +101,7 @@ Middlewares will be executed in the order they are passed in this function.
 ## zyph's hydration middleware
 `zyph` provides a hydration middleware that hydrates the client with whichever web components they need. Wherever you create your server and register your routes, call:
 ```zig
-var hydration_context = try zyph.hydration_middleware.Context.init(allocator, try std.fs.cwd().openFile("path/to/index.html", .{}));
+var hydration_context = try zyph.hydration_middleware.Context.init(allocator, "path/to/components", try std.fs.cwd().openFile("path/to/index.html", .{}));
 defer hydration_context.deinit(allocator);
 try server.middlewares.put(
     zyph.hydration_middleware.NAME,
