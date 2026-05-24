@@ -90,7 +90,7 @@ pub fn handler(ctx: *Context, a: std.mem.Allocator, r: *std.http.Server.Request,
         var included_counter: usize = 0;
         while (needed_iter.next()) |comp| {
             var buf: [1024]u8 = undefined;
-            const name = @import("components.zig").componentName(comp.full_path, &buf) catch @panic("failed to create component name");
+            const name = @import("components.zig").componentName(comp.relative_path, &buf) catch @panic("failed to create component name");
             const needle = try std.fmt.allocPrint(a, "<{s}", .{name});
             if (std.mem.indexOf(u8, writer.buffer, needle) != null) {
                 log.debug("including {s}\n", .{name});
