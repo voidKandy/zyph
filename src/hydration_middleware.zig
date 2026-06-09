@@ -82,7 +82,7 @@ pub fn handler(ctx: *Context, a: std.mem.Allocator, r: *std.http.Server.Request,
                 log.debug("removing {s} : {d}\n", .{ sanitized, hash });
                 const removed = map.remove(std.hash_map.hashString(sanitized));
                 if (!removed)
-                    log.warn("failed to remove {s}\n", .{sanitized});
+                    log.debug("tried to remove '{s}' but it had no entry\n", .{sanitized});
             }
         }
 
