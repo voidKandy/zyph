@@ -6,7 +6,7 @@ pub const ComponentsDirectory = root.cache.CachedDirectory(
     &struct {
         pub fn hash(fi: root.cache.FileItem) u64 {
             var buf: [1024]u8 = undefined;
-            const name = componentName(fi.full_path, &buf) catch @panic("failed to create component name");
+            const name = componentName(fi.relative_path, &buf) catch @panic("failed to create component name");
             return std.hash_map.hashString(name);
         }
     }.hash,
@@ -20,7 +20,9 @@ pub fn componentName(full_path: []const u8, buf: []u8) anyerror![]u8 {
 
     var split = std.mem.splitBackwardsScalar(u8, full_path, '.');
     _ = split.first();
-    const filename = split.next() orelse return error.InvalidFilename;
+    const path = split.next() orelse return error.InvalidFilename;
+    // remove leading '/'
+    const filename = path[1..];
 
     var i: usize = 0;
     for (filename) |ch| {
