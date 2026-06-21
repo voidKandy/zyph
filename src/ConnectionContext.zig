@@ -16,17 +16,17 @@ server_ptr: *const Server,
 const Self = @This();
 
 const ConnectionType = union(enum) {
-    http: std.net.Server.Connection,
+    http: std.Io.net.Stream,
     https: *tls.Connection,
 };
 
 const RECV_BUF_SIZE = 16 * 1024;
 const SEND_BUF_SIZE = 16 * 1024;
 
-pub fn init(allocator: std.mem.Allocator, server: *const Server, conn: std.net.Server.Connection) std.mem.Allocator.Error!Self {
+pub fn init(allocator: std.mem.Allocator, server: *const Server, stream: std.Io.net.Stream) std.mem.Allocator.Error!Self {
     return .{
         .allocator = allocator,
-        .connection = .{ .http = conn },
+        .connection = .{ .http = stream },
         .server_ptr = server,
         .recv_buf = try allocator.alloc(u8, RECV_BUF_SIZE),
         .send_buf = try allocator.alloc(u8, SEND_BUF_SIZE),
@@ -35,7 +35,7 @@ pub fn init(allocator: std.mem.Allocator, server: *const Server, conn: std.net.S
 
 pub fn deinit(self: *Self) void {
     switch (self.connection) {
-        .http => |c| c.stream.close(),
+        .http => |strm| strm.close(self.server_ptr.io),
         .https => |c| {
             c.close() catch |e| {
                 log.err(
@@ -132,11 +132,17 @@ pub fn dispatchRequest(self: *Self, request: *Request) anyerror!void {
 pub fn handleConnection(self: *Self) !void {
     var server: std.http.Server = undefined;
     defer self.deinit();
-    const addr = self.connection.http.address;
+    const addr = self.connection.http.socket.address;
 
     if (self.server_ptr.*.tls_auth) |auth_ptr| {
         const tls_conn = try self.allocator.create(tls.Connection);
-        tls_conn.* = try tls.serverFromStream(self.connection.http.stream, .{ .auth = auth_ptr });
+        var xoshiro = std.Random.Xoshiro256.init(256);
+        const rand = xoshiro.random();
+        tls_conn.* = try tls.serverFromStream(self.server_ptr.io, self.connection.http, .{
+            .auth = auth_ptr,
+            .rng = rand,
+            .now = std.Io.Timestamp.now(self.server_ptr.io, .real),
+        });
         self.connection = .{ .https = tls_conn };
 
         var r = self.connection.https.reader(self.recv_buf);
@@ -146,9 +152,9 @@ pub fn handleConnection(self: *Self) !void {
             \\ Created HTTPS connection
         , .{});
     } else {
-        var r = self.connection.http.stream.reader(self.recv_buf);
-        var w = self.connection.http.stream.writer(self.send_buf);
-        server = std.http.Server.init(r.interface(), &w.interface);
+        var r = self.connection.http.reader(self.server_ptr.io, self.recv_buf);
+        var w = self.connection.http.writer(self.server_ptr.io, self.send_buf);
+        server = std.http.Server.init(&r.interface, &w.interface);
         log.info(
             \\ Created HTTP connection
         , .{});

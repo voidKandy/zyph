@@ -19,15 +19,10 @@ const Route =
         }
     };
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{
-        .thread_safe = true,
-    }){};
-    defer if (gpa.detectLeaks()) std.log.err("LEAKS DETECTED IN MAIN ALLOCATOR\n", .{});
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.arena.allocator();
 
-    const allocator = gpa.allocator();
-
-    var server = zyph.Server.init(allocator, null);
+    var server = zyph.Server.init(allocator, init.io, null);
 
     try server.middlewares.put(
         "logger",
@@ -42,8 +37,9 @@ pub fn main() !void {
 
     var hydration_context = try zyph.hydration_middleware.Context.init(
         allocator,
+        init.io,
         "components",
-        try std.fs.cwd().openFile("test_pages/index.html", .{}),
+        try std.Io.Dir.cwd().openFile(init.io, "test_pages/index.html", .{}),
     );
     defer hydration_context.deinit(allocator);
     try server.middlewares.put(
@@ -57,15 +53,12 @@ pub fn main() !void {
     try home_route.addMiddlewares(.pre, &.{"logger"});
     try home_route.addMiddlewares(.post, &.{zyph.hydration_middleware.NAME});
 
-    var env_map = try std.process.getEnvMap(allocator);
-    defer env_map.deinit();
-    const port_str = env_map.get("PORT") orelse "3000";
+    const port_str = init.environ_map.get("PORT") orelse "3000";
     const port = try std.fmt.parseInt(u16, port_str, 10);
-    const addr = try std.net.Address.parseIp("0.0.0.0", port);
-    try server.startServer(addr, .{ .reuse_address = true });
+    const addr = try std.Io.net.IpAddress.parse("0.0.0.0", port);
+    try server.startServer(&addr, .{ .reuse_address = true });
 
     server.listen() catch @panic("failed listen");
 
-    // std.Thread.sleep(60_000);
     return;
 }

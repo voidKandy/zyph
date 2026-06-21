@@ -13,14 +13,16 @@ pub const FileServerDirectory = root.cache.CachedDirectory(
 
 const Self = @This();
 aliases: std.StringHashMap(u64),
+io: std.Io,
 
-pub fn init(a: std.mem.Allocator, path: []const u8) std.mem.Allocator.Error!Self {
-    FileServerDirectory.init(a, path);
+pub fn init(a: std.mem.Allocator, io: std.Io, path: []const u8) std.mem.Allocator.Error!Self {
+    FileServerDirectory.init(a, io, path);
     var aliases = std.StringHashMap(u64).init(a);
     try aliases.put("/", std.hash_map.hashString("/index.html"));
     try aliases.put("404", std.hash_map.hashString("/404.html"));
     return .{
         .aliases = aliases,
+        .io = io,
     };
 }
 
@@ -32,7 +34,7 @@ pub fn deinit(self: *Self) void {
 pub const ServeError = error{FileNotFound} || std.http.Server.Request.ExpectContinueError;
 
 pub fn serve(self: Self, request: *std.http.Server.Request) ServeError!void {
-    FileServerDirectory.tryUpdate() catch |e| log.err("Failed to update file server directory: {any}\n", .{e});
+    FileServerDirectory.tryUpdate(self.io) catch |e| log.err("Failed to update file server directory: {any}\n", .{e});
     const path = request.head.target;
     const file, const status: std.http.Status = b: {
         const key = if (self.aliases.get(path)) |alias_key|

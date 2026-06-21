@@ -19,18 +19,21 @@ routes: RouteMap,
 files: ?FileServer,
 allocator: std.mem.Allocator,
 tls_auth: ?*tls.config.CertKeyPair = null,
-server: std.net.Server = undefined,
+server: std.Io.net.Server = undefined,
+io: std.Io,
 
 const Self = @This();
 
 pub fn init(
     a: std.mem.Allocator,
+    io: std.Io,
     file_server_dir: ?[]const u8,
 ) Self {
     return .{
         .routes = RouteMap.init(),
-        .files = if (file_server_dir) |dir| FileServer.init(a, dir) catch @panic("OOM") else null,
+        .files = if (file_server_dir) |dir| FileServer.init(a, io, dir) catch @panic("OOM") else null,
         .allocator = a,
+        .io = io,
         .middlewares = std.StringHashMap(Middleware).init(a),
     };
 }
@@ -41,7 +44,7 @@ pub fn deinit(self: *Self) void {
         a.deinit(self.allocator);
         self.allocator.destroy(a);
     }
-    defer self.server.deinit();
+    defer self.server.deinit(self.io);
 }
 
 pub fn withTls(self: *Self, dir: std.fs.Dir, cert_path: []const u8, key_path: []const u8) !void {
@@ -50,36 +53,32 @@ pub fn withTls(self: *Self, dir: std.fs.Dir, cert_path: []const u8, key_path: []
     self.tls_auth = auth;
 }
 
-pub fn startServer(self: *Self, addr: std.net.Address, opts: std.net.Address.ListenOptions) !void {
-    self.server = try std.net.Address.listen(addr, opts);
+pub fn startServer(self: *Self, addr: *const std.Io.net.IpAddress, opts: std.Io.net.IpAddress.ListenOptions) !void {
+    self.server = try std.Io.net.IpAddress.listen(addr, self.io, opts);
 }
 
 pub fn listen(self: *Self) !void {
     log.info(
         \\ Listening on {f}
-    , .{self.server.listen_address});
-    var gpa = std.heap.GeneralPurposeAllocator(.{
-        .thread_safe = true,
-    }){};
-    const allocator = gpa.allocator();
+    , .{self.server.socket.address});
 
     while (true) {
-        var conn = self.server.accept() catch |err| {
+        var conn = self.server.accept(self.io) catch |err| {
             log.err(
                 \\ Failed to accept connection: {s}
             , .{@errorName(err)});
             continue;
         };
-        errdefer conn.stream.close();
+        errdefer conn.close(self.io);
 
         log.warn(
             \\ Connected to client at address: {f}
             \\
-        , .{conn.address});
+        , .{conn.socket.address});
 
-        const ctx = allocator.create(ConnectionContext) catch @panic("out of memory");
+        const ctx = self.allocator.create(ConnectionContext) catch @panic("out of memory");
         ctx.* = try ConnectionContext.init(
-            allocator,
+            self.allocator,
             &self.*,
             conn,
         );
@@ -89,7 +88,7 @@ pub fn listen(self: *Self) !void {
         }) catch |err| {
             log.err("unable to spawn connection thread: {s}", .{@errorName(err)});
             ctx.deinit();
-            allocator.destroy(ctx);
+            self.allocator.destroy(ctx);
             continue;
         };
 

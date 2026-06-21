@@ -4,33 +4,33 @@ pub const Middleware = @import("Middleware.zig");
 pub const cache = @import("cache.zig");
 pub const hydration_middleware = @import("hydration_middleware.zig");
 
-pub fn computeFolderMRC(path: []const u8) !u64 {
-    const cwd = std.fs.cwd();
-    var dir = try cwd.openDir(path, .{ .iterate = true });
-    defer dir.close();
-    return computeMRCIntoDir(dir);
+pub fn computeFolderMRC(io: std.Io, path: []const u8) !u64 {
+    const cwd = std.Io.Dir.cwd();
+    var dir = try cwd.openDir(io, path, .{ .iterate = true });
+    defer dir.close(io);
+    return computeMRCIntoDir(io, dir);
 }
 
-fn computeMRCIntoDir(dir: std.fs.Dir) !u64 {
-    var latest: u64 = 0;
+fn computeMRCIntoDir(io: std.Io, dir: std.Io.Dir) !u64 {
+    var latest: i96 = 0;
     var it = dir.iterate();
-    while (try it.next()) |entry| {
+    while (try it.next(io)) |entry| {
         switch (entry.kind) {
             .file => {
-                const stat = try dir.statFile(entry.name);
-                const modified: u64 = @intCast(stat.mtime);
+                const stat = try dir.statFile(io, entry.name, .{});
+                const modified: i96 = stat.mtime.nanoseconds;
                 if (modified > latest) latest = modified;
             },
             .directory => {
-                var subdir = try dir.openDir(entry.name, .{ .iterate = true });
-                defer subdir.close();
-                const sub_mrc = try computeMRCIntoDir(subdir);
+                var subdir = try dir.openDir(io, entry.name, .{ .iterate = true });
+                defer subdir.close(io);
+                const sub_mrc = try computeMRCIntoDir(io, subdir);
                 if (sub_mrc > latest) latest = sub_mrc;
             },
             else => continue,
         }
     }
-    return latest;
+    return @as(u64, @intCast(latest));
 }
 
 pub fn getHeader(r: std.http.Server.Request, key: []const u8) ?[]const u8 {

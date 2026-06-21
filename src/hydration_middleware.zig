@@ -10,23 +10,22 @@ const FullPageRefresh = struct { route_content: []const u8 };
 pub const NAME = "hydration";
 pub const Context = struct {
     index_file_content: []u8,
+    io: std.Io,
 
-    pub fn init(a: std.mem.Allocator, components_dir_path: []const u8, index_file: std.fs.File) std.mem.Allocator.Error!@This() {
-        ComponentsDirectory.init(a, components_dir_path);
+    pub fn init(a: std.mem.Allocator, io: std.Io, components_dir_path: []const u8, index_file: std.Io.File) anyerror!@This() {
+        ComponentsDirectory.init(a, io, components_dir_path);
 
-        var reader_buffer: [1024 * 64]u8 = undefined;
-        var reader = index_file.reader(&reader_buffer);
-        var dest_buffer: [1024 * 64]u8 = undefined;
-        var amt_read: usize = 0;
-        while (true) {
-            const amt = reader.readPositional(&dest_buffer) catch |e| if (e == error.EndOfStream) break else @panic("failed to read index file");
-            amt_read += amt;
-            if (amt <= 0) break;
-        }
-        const index_file_content = a.dupe(u8, dest_buffer[0..amt_read]) catch @panic("out of memory");
+        // var reader_buffer: [1024 * 64]u8 = undefined;
+        // var reader = index_file.reader(io, &reader_buffer);
+        // var dest_buffer: [1024 * 64]u8 = undefined;
+        // var amt_read: usize = 0;
+        // const size = try index_file.length(io);
+        var reader = index_file.reader(io, &.{});
+        const content = try reader.interface.allocRemaining(a, .unlimited);
 
         return .{
-            .index_file_content = index_file_content,
+            .index_file_content = content,
+            .io = io,
         };
     }
     pub fn deinit(self: *@This(), a: std.mem.Allocator) void {
@@ -69,7 +68,7 @@ pub fn handler(ctx: *Context, a: std.mem.Allocator, r: *std.http.Server.Request,
             \\  <section id="components-cache" hx-swap-oob="{s}">
         , .{oob_swap}) catch @panic("out of memory")) catch @panic("out of memory");
 
-        ComponentsDirectory.tryUpdate() catch |e| log.err("Failed to update components directory: {any}\n", .{e});
+        ComponentsDirectory.tryUpdate(ctx.io) catch |e| log.err("Failed to update components directory: {any}\n", .{e});
         // BAD? Map is cloned, Is this necessary?
         var map = try ComponentsDirectory.get().map.clone();
 

@@ -5,12 +5,12 @@
     .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .zemplate = .{
-            .url = "git+https://github.com/voidKandy/zemplate#39bc091b4c47baecd6236c4f0c19f40ce6c89fd8",
-            .hash = "zemplate-1.5.1-tSKpW9tKAQDOruerwsqO5xtoUcuzs8bVRNgZYfOU5pBS",
+            .url = "git+https://github.com/voidKandy/zemplate#10e152e5a0e37c04eb9c53b243bfa1102b8ae871",
+            .hash = "zemplate-1.5.2-tSKpW89SAQAcctPfi8RgHqr6OK7ej5XgTGCCDfjP-Kqs",
         },
         .tls = .{
-            .url = "git+https://github.com/ianic/tls.zig#9d56751c99267075908c63a8a91ffc1e7f252df4",
-            .hash = "tls-0.1.0-ER2e0gNoBQBLuvbg_hPuGQYoCVsn-kHDuupr0hsapu4P",
+            .url = "git+https://github.com/ianic/tls.zig#0949fcac8f7d4e0d3fe003ccd5d35e0b0f399314",
+            .hash = "tls-0.1.0-ER2e0rCuBQC_MjKeqPnn6WerAQRedkSzaobtp3DZr5o-",
         },
         .mime = .{
             .url = "git+https://github.com/andrewrk/mime#4535b74bd5fcaa03e22f2f25af164a4c6253af00",

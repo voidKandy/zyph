@@ -3,6 +3,10 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    var threaded: std.Io.Threaded = .init(b.allocator, .{});
+    defer threaded.deinit();
+    const io = threaded.io();
+
     const mime = b.dependency("mime", .{});
     const tls = b.dependency("tls", .{});
     const zemplate = b.dependency("zemplate", .{});
@@ -16,7 +20,7 @@ pub fn build(b: *std.Build) void {
     mod.addImport("tls", tls.module("tls"));
     mod.addImport("zemplate", zemplate.module("zemplate"));
 
-    buildExamples(b, target, optimize, mod) catch |e| {
+    buildExamples(b, io, target, optimize, mod) catch |e| {
         std.log.err("Failed to build examples: {any}", .{e});
     };
 
@@ -39,9 +43,9 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_lib_unit_tests.step);
 }
 
-fn buildExamples(b: *std.Build, target: std.Build.ResolvedTarget, opt: std.builtin.OptimizeMode, core_lib: *std.Build.Module) anyerror!void {
+fn buildExamples(b: *std.Build, io: std.Io, target: std.Build.ResolvedTarget, opt: std.builtin.OptimizeMode, core_lib: *std.Build.Module) anyerror!void {
     const examples_dir = "examples";
-    const dir = std.fs.cwd().openDir(examples_dir, .{}) catch |e| {
+    const dir = std.Io.Dir.cwd().openDir(io, examples_dir, .{}) catch |e| {
         std.log.err("Failed to get examples: {s}\nError: {any}", .{ examples_dir, e });
         return e;
     };
@@ -49,7 +53,7 @@ fn buildExamples(b: *std.Build, target: std.Build.ResolvedTarget, opt: std.built
     @memset(&buffer, 0);
     var fba = std.heap.FixedBufferAllocator.init(&buffer);
     var iter = dir.iterate();
-    while (iter.next() catch |e| {
+    while (iter.next(io) catch |e| {
         std.log.err("Dir iterator failure: {}\n", .{e});
         return e;
     }) |f| {

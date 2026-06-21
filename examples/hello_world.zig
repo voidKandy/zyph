@@ -5,14 +5,9 @@ pub const std_options = std.Options{
     .log_level = .debug,
 };
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{
-        .thread_safe = true,
-    }){};
-    defer if (gpa.detectLeaks()) std.log.err("LEAKS DETECTED IN MAIN ALLOCATOR\n", .{});
-
-    const allocator = gpa.allocator();
-    var server = zyph.Server.init(allocator, null);
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.arena.allocator();
+    var server = zyph.Server.init(allocator, init.io, null);
     defer server.deinit();
 
     _ = try server.registerHypermediaEndpoint("/", &.{}, &struct {
@@ -27,13 +22,10 @@ pub fn main() !void {
             );
         }
     }.handler);
-
-    var env_map = try std.process.getEnvMap(allocator);
-    defer env_map.deinit();
-    const port_str = env_map.get("PORT") orelse "3000";
+    const port_str = init.environ_map.get("PORT") orelse "3000";
     const port = try std.fmt.parseInt(u16, port_str, 10);
-    const addr = try std.net.Address.parseIp("0.0.0.0", port);
-    try server.startServer(addr, .{ .reuse_address = true });
+    const addr = try std.Io.net.IpAddress.parse("0.0.0.0", port);
+    try server.startServer(&addr, .{ .reuse_address = true });
 
     server.listen() catch @panic("failed listen");
 
