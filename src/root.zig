@@ -81,16 +81,16 @@ pub inline fn validateFunctionType(func: anytype, TargetType: type) void {
         };
         const ef = @typeInfo(expected_info.pointer.child).@"fn";
 
-        if (f.params.len != ef.params.len) {
+        if (f.param_attrs.len != ef.param_attrs.len) {
             @compileError("Expected func to have " ++ ef.params.len ++ " parameters");
         }
 
         // skipping anyopaque
-        for (f.params[1..], ef.params[1..], 2..) |p, ep, i| {
-            if (p.type != ep.type)
-                @compileError("Expected func's " ++ i ++ " argument to be of type " ++ @typeName(ep.type.?) ++
+        for (f.param_types[1..], ef.param_types[1..], 2..) |p, ep, i| {
+            if (p != ep)
+                @compileError("Expected func's " ++ i ++ " argument to be of type " ++ @typeName(ep.?) ++
                     " Found " ++
-                    @typeName(p.type.?));
+                    @typeName(type.?));
         }
 
         if (!ret: {

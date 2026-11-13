@@ -1,20 +1,20 @@
 .{
     .name = .zyph,
     .fingerprint = 0x12b05ca7fdb0a4cf,
-    .version = "0.2.7",
-    .minimum_zig_version = "0.15.1",
+    .version = "0.3.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
-        .zemplate = .{
-            .url = "git+https://github.com/voidKandy/zemplate#10e152e5a0e37c04eb9c53b243bfa1102b8ae871",
-            .hash = "zemplate-1.5.2-tSKpW89SAQAcctPfi8RgHqr6OK7ej5XgTGCCDfjP-Kqs",
-        },
-        .tls = .{
-            .url = "git+https://github.com/ianic/tls.zig#0949fcac8f7d4e0d3fe003ccd5d35e0b0f399314",
-            .hash = "tls-0.1.0-ER2e0rCuBQC_MjKeqPnn6WerAQRedkSzaobtp3DZr5o-",
-        },
         .mime = .{
             .url = "git+https://github.com/andrewrk/mime#4535b74bd5fcaa03e22f2f25af164a4c6253af00",
             .hash = "mime-4.0.0-zwmL--0gAACndOVlROQeDnM0chfojNDS8tpohlsBqMNy",
+        },
+        .tls = .{
+            .url = "git+https://github.com/ianic/tls.zig#bd22bcb73f423389441a1de80bf031ef1b623cce",
+            .hash = "tls-0.1.0-ER2e0l6qBgDEYo6RBkVZw5UrxOqtI6-OqLwyFJvEr3RK",
+        },
+        .zemplate = .{
+            .url = "git+https://github.com/voidKandy/zemplate#4e8703396cd80b7b5f930fb08200ff5ac002e125",
+            .hash = "zemplate-1.6.0-tSKpW_NSAQDBRbc9yywXW_23qbqywTWQptbvqvfu-VUb",
         },
     },
     .paths = .{

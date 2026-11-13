@@ -79,9 +79,6 @@ fn buildExamples(b: *std.Build, io: std.Io, target: std.Build.ResolvedTarget, op
         const run = b.addRunArtifact(exe);
         const step = b.step(name, f.name);
         step.dependOn(&run.step);
-
-        if (b.args) |args| {
-            run.addArgs(args);
-        }
+        run.addPassthruArgs();
     }
 }
