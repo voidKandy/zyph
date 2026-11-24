@@ -1,7 +1,7 @@
 .{
     .name = .zyph,
     .fingerprint = 0x12b05ca7fdb0a4cf,
-    .version = "0.3.0",
+    .version = "0.3.1",
     .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .mime = .{
