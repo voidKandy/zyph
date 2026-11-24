@@ -47,7 +47,7 @@ pub fn deinit(self: *Self) void {
     defer self.server.deinit(self.io);
 }
 
-pub fn withTls(self: *Self, dir: std.fs.Dir, cert_path: []const u8, key_path: []const u8) !void {
+pub fn withTls(self: *Self, dir: std.Io.Dir, cert_path: []const u8, key_path: []const u8) !void {
     const auth = self.allocator.create(tls.config.CertKeyPair) catch @panic("out of memory");
     auth.* = try tls.config.CertKeyPair.fromFilePath(self.allocator, dir, cert_path, key_path);
     self.tls_auth = auth;
